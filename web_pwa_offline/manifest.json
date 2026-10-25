@@ -1,0 +1,8 @@
+{
+  "name": "TCMU-1 Smart Motor & Cash Memo",
+  "short_name": "TCMU-1 App",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f766e"
+}

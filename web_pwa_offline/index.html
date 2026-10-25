@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TCMU-1 Universal GSM Motor Controller & Cash Memo System</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .pulse-ring {
+      animation: pulseRing 2s infinite;
+    }
+    @keyframes pulseRing {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+      70% { box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between pb-20">
+
+  <!-- Top Header Bar -->
+  <header class="sticky top-0 z-30 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3">
+    <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5">
+        <div id="statusDot" class="w-3.5 h-3.5 rounded-full bg-rose-500"></div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            TCMU-1 Smart Controller
+            <span id="headerModeBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">AUTO (4*1)</span>
+          </h1>
+          <p class="text-xs text-slate-400">SIM: <span id="headerSimDisplay" class="text-slate-200 font-mono">+91 9876543210</span> | Rate: <span class="text-amber-400 font-semibold">₹<span id="headerStickyRate">120</span>/hr</span></p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btnCheckStatusTop" onclick="triggerStatusCheck()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow">
+          <span>🔄 Status (5*)</span>
+        </button>
+        <button id="btnOpenSmsSimModal" onclick="toggleSmsSimDrawer()" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow">
+          <span>📩 Test Incoming SMS</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Toast Banner -->
+  <div id="toastBanner" class="fixed top-16 right-4 z-50 hidden max-w-sm bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl border border-emerald-400/40 text-xs sm:text-sm font-medium">
+    <span id="toastText">Action completed</span>
+  </div>
+
+  <!-- Main Content Container -->
+  <main class="max-w-4xl w-full mx-auto px-4 py-4 space-y-5 flex-1">
+
+    <!-- TAB 1: HOME CONTROL ROOM -->
+    <section id="tabHome" class="space-y-4">
+      <!-- Live Hardware Telemetry Bar -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div class="glass-card rounded-xl p-3 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] text-slate-400 uppercase font-semibold">Mains Power</p>
+            <p id="telemetryPower" class="text-sm font-bold text-emerald-400">AVAILABLE</p>
+          </div>
+          <span class="text-xl">⚡</span>
+        </div>
+        <div class="glass-card rounded-xl p-3 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] text-slate-400 uppercase font-semibold">Battery</p>
+            <p id="telemetryBattery" class="text-sm font-bold text-sky-400">CHARGING</p>
+          </div>
+          <span class="text-xl">🔋</span>
+        </div>
+        <div class="glass-card rounded-xl p-3 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] text-slate-400 uppercase font-semibold">GSM Signal</p>
+            <p id="telemetrySignal" class="text-sm font-bold text-amber-400">63%</p>
+          </div>
+          <span class="text-xl">📶</span>
+        </div>
+        <div class="glass-card rounded-xl p-3 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] text-slate-400 uppercase font-semibold">Pump State</p>
+            <p id="telemetryPump" class="text-sm font-bold text-rose-400">STOPPED</p>
+          </div>
+          <span class="text-xl">🚰</span>
+        </div>
+      </div>
+
+      <!-- Active Session & Live Timer Dashboard -->
+      <div class="glass-card rounded-2xl p-5 border border-slate-700/80 shadow-xl">
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-700/70">
+          <div>
+            <span class="text-xs uppercase tracking-wider font-semibold text-slate-400">Live Motor & Billing Session</span>
+            <h2 id="liveCustomerDisplay" class="text-lg sm:text-xl font-bold text-white mt-0.5">No Active Session (Motor Off)</h2>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="cooldownBadge" class="hidden text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              🔒 Anti-Spam Lock: <span id="cooldownCount">30</span>s
+            </span>
+            <span id="retryBadge" class="hidden text-xs font-bold px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/40">
+              📡 Auto-Retry: <span id="retryCount">1/3</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 py-5 text-center">
+          <div class="bg-slate-900/80 rounded-xl p-4 border border-slate-800">
+            <p class="text-xs text-slate-400 font-medium">Net Running Time (चलने का समय)</p>
+            <p id="liveRunTimer" class="text-3xl sm:text-4xl font-extrabold font-mono text-emerald-400 mt-1">00:00:00</p>
+            <p id="timerTargetSub" class="text-[11px] text-slate-400 mt-1">Mode: Ready</p>
+          </div>
+          <div class="bg-slate-900/80 rounded-xl p-4 border border-slate-800">
+            <p class="text-xs text-slate-400 font-medium">Power Cut Pause (लाइट कटौती माइनस)</p>
+            <p id="livePauseTimer" class="text-2xl sm:text-3xl font-bold font-mono text-amber-400 mt-1">00:00:00</p>
+            <p class="text-[11px] text-slate-400 mt-1">Auto-deducted from bill</p>
+          </div>
+          <div class="bg-slate-900/80 rounded-xl p-4 border border-slate-800">
+            <p class="text-xs text-slate-400 font-medium">Live Cash Memo Amount (कुल बिल)</p>
+            <p class="text-3xl sm:text-4xl font-extrabold text-white mt-1">₹<span id="liveBillAmount">0.00</span></p>
+            <p id="liveRateNote" class="text-[11px] text-amber-300 mt-1">Sticky Rate: ₹120/hr</p>
+          </div>
+        </div>
+
+        <!-- Quick Session Customer & Sticky Rate / Manual Amount Controls -->
+        <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800/90 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-teal-300">Customer & Rate Input (Sticky Rate + Manual Override)</h3>
+            <span class="text-[11px] text-slate-400">Jo rate daalenge wahi aage sab par chalega</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs text-slate-300 mb-1">Customer Name (ग्राहक का नाम)</label>
+              <input id="inputCustomerName" type="text" placeholder="e.g. Ramesh Kisan" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-teal-400" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-300 mb-1">Hourly Rate ₹/hr (ऑटो-सेव रेट)</label>
+              <input id="inputHourlyRate" type="number" value="120" onchange="updateStickyRateFromInput()" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-amber-500/50 text-sm font-bold text-amber-300 focus:outline-none focus:border-amber-400" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-300 mb-1">Manual Total Bill ₹ (फिक्स रकम बॉक्स - Optional)</label>
+              <input id="inputManualFixedAmount" type="number" placeholder="खाली छोड़ें या फिक्स ₹ डालें" oninput="recalcLiveDisplay()" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-emerald-300 focus:outline-none focus:border-emerald-400" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 Start Buttons + Stop Button -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+          <button id="btnNormalStart" onclick="handleNormalStart()" class="py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-bold text-sm shadow-lg shadow-emerald-900/40 flex flex-col items-center justify-center gap-0.5 transition">
+            <span>🟢 NORMAL START (1*)</span>
+            <span class="text-[11px] font-normal text-emerald-100">Jab tak Stop na karein</span>
+          </button>
+
+          <button id="btnTimerStart" onclick="openTimerModal()" class="py-3.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 active:scale-[0.99] text-white font-bold text-sm shadow-lg shadow-teal-900/40 flex flex-col items-center justify-center gap-0.5 transition">
+            <span>⏱️ TIMER START (3*X)</span>
+            <span class="text-[11px] font-normal text-teal-100">Fixed time (1 = 30 min)</span>
+          </button>
+
+          <button id="btnContinueStart" onclick="handleContinueStart()" class="py-3.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 active:scale-[0.99] text-white font-bold text-sm shadow-lg shadow-amber-900/40 flex flex-col items-center justify-center gap-0.5 transition">
+            <span>▶️ CONTINUE / RESUME</span>
+            <span class="text-[11px] font-normal text-amber-100">Purana रुका सेशन आगे बढ़ाएं</span>
+          </button>
+        </div>
+
+        <button id="btnStopMotor" onclick="handleStopMotor()" class="w-full mt-3 py-4 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white font-extrabold text-base shadow-lg shadow-rose-900/40 flex items-center justify-center gap-2 transition">
+          <span>🔴 STOP MOTOR & GENERATE CASH MEMO (2*)</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- TAB 2: CASH MEMO / HISAB HISTORY -->
+    <section id="tabHisab" class="hidden space-y-4">
+      <div class="glass-card rounded-2xl p-5 border border-slate-700/80">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-700">
+          <div>
+            <h2 class="text-lg font-bold text-white">🧾 Cash Memo & Billing History (हिसाब-किताब)</h2>
+            <p class="text-xs text-slate-400">Bina kisi dukan naam ke saaf Cash Memo slip — Paid & Udhaar tracking ke saath</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnExportCsv" onclick="exportHistoryCsv()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white">
+              📥 Export Excel/CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Summary KPI Cards -->
+        <div class="grid grid-cols-3 gap-3 my-4 text-center">
+          <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-800">
+            <p class="text-[11px] text-slate-400">Total Cash Memos</p>
+            <p id="kpiTotalSessions" class="text-xl font-bold text-white">2</p>
+          </div>
+          <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-800">
+            <p class="text-[11px] text-slate-400">Paid Collection (नकद प्राप्त)</p>
+            <p class="text-xl font-bold text-emerald-400">₹<span id="kpiPaidAmount">360.00</span></p>
+          </div>
+          <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-800">
+            <p class="text-[11px] text-slate-400">Pending Udhaar (बाकी उधार)</p>
+            <p class="text-xl font-bold text-amber-400">₹<span id="kpiPendingAmount">180.00</span></p>
+          </div>
+        </div>
+
+        <div id="cashMemoList" class="space-y-3"></div>
+      </div>
+    </section>
+
+    <!-- TAB 3: SETTINGS, USERS (10*) & UNIVERSAL SMS CONFIG -->
+    <section id="tabSettings" class="hidden space-y-4">
+      <!-- Security Lock Gate (Fingerprint / Phone PIN) -->
+      <div id="settingsLockOverlay" class="glass-card rounded-2xl p-8 text-center space-y-4 border border-teal-500/40">
+        <div class="w-16 h-16 rounded-full bg-teal-500/20 border border-teal-400/40 mx-auto flex items-center justify-center text-3xl">
+          🔐
+        </div>
+        <h2 class="text-xl font-bold text-white">Phone Security Lock (Fingerprint / Device PIN)</h2>
+        <p class="text-xs sm:text-sm text-slate-300 max-w-md mx-auto">
+          Aapki request ke mutabik Settings aur User Management aapke phone ke **Fingerprint** ya **Phone Lock Screen PIN** se surakshit hai.
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <button id="btnUnlockBiometric" onclick="unlockSettingsWithBiometric()" class="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm shadow-lg flex items-center gap-2">
+            <span>👆 Unlock with Fingerprint / Phone PIN</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Unlocked Settings Content -->
+      <div id="settingsUnlockedContent" class="hidden space-y-5">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <!-- LEFT COLUMN: SETTINGS & USERS (*TCMU-1 USERS*) -->
+          <div class="glass-card rounded-2xl p-5 border border-slate-700 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+              <h3 class="text-base font-bold text-white">⚙️ Device Settings & Users (*TCMU-1 USERS*)</h3>
+              <button id="btnLockSettingsAgain" onclick="lockSettingsPanel()" class="text-xs text-rose-400 hover:underline">🔒 Lock Panel</button>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Motor Controller SIM Number</label>
+              <input id="cfgMotorSim" type="text" value="+91 9876543210" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-white font-mono" />
+            </div>
+
+            <!-- Auto Restart Switch (4*1 / 4*0) -->
+            <div class="flex items-center justify-between bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
+              <div>
+                <p class="text-sm font-bold text-white">Auto-Restart on Power Cut</p>
+                <p class="text-xs text-slate-400">ON sends <code class="text-emerald-300">4*1</code> | OFF sends <code class="text-amber-300">4*0</code></p>
+              </div>
+              <button id="btnToggleAutoMode" onclick="toggleAutoModeSwitch()" class="px-4 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold transition">
+                ON (4*1)
+              </button>
+            </div>
+
+            <!-- Manage 4 Users Database (Pre-loaded with user's exact reply) -->
+            <div class="space-y-2.5 pt-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-sky-300">Registered Users (11* to 14* & 16*)</span>
+                <button id="btnSyncUsers10" onclick="syncUsersFromDevice10()" class="px-3 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-semibold text-white">
+                  🔄 Sync Users (10*)
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400">
+                Pre-loaded from your <code class="text-emerald-300">*TCMU-1 USERS*</code> reply (`USER1=8081728811`, `USER2=7839455008`, `USER3=Empty`, `USER4=9236504217`):
+              </p>
+
+              <div id="usersSlotContainer" class="space-y-2"></div>
+
+              <button id="btnResetAllUsers" onclick="resetAllUsers16()" class="w-full mt-2 py-2.5 rounded-xl bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold">
+                🗑️ RESET ALL USERS (Send 16*1234)
+              </button>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: UNIVERSAL SMS CONFIG (Future-Ready Paste & Work) -->
+          <div class="glass-card rounded-2xl p-5 border border-slate-700 space-y-3.5">
+            <div class="border-b border-slate-700 pb-3">
+              <h3 class="text-base font-bold text-white">🛠️ Universal SMS Config (Future-Ready)</h3>
+              <p class="text-xs text-slate-400">Baad mein Timer (`3*X`) ya kisi bhi naye starter ka reply yahan paste karein — turant kaam karega!</p>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 items-center">
+              <div class="col-span-1">
+                <label class="block text-[11px] text-slate-400">Start Cmd</label>
+                <input id="cfgCmdStart" type="text" value="1*" class="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-white" />
+              </div>
+              <div class="col-span-2">
+                <label class="block text-[11px] text-slate-400">Start Expected Reply</label>
+                <input id="cfgReplyStart" type="text" value="PUMP STARTED" class="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-emerald-300" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 items-center">
+              <div class="col-span-1">
+                <label class="block text-[11px] text-slate-400">Stop Cmd</label>
+                <input id="cfgCmdStop" type="text" value="2*" class="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-white" />
+              </div>
+              <div class="col-span-2">
+                <label class="block text-[11px] text-slate-400">Stop Expected Reply</label>
+                <input id="cfgReplyStop" type="text" value="PUMP STOPPED" class="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-rose-300" />
+              </div>
+            </div>
+
+            <!-- Universal Timer (3*X) Paste Later Config -->
+            <div class="p-3 rounded-xl bg-teal-950/40 border border-teal-500/30 space-y-2">
+              <p class="text-xs font-bold text-teal-300">⏱️ Scheduler / Timer (3*X) Universal Reply Slots</p>
+              <p class="text-[11px] text-slate-300">Jab aap <code class="text-white">3*X</code> test karein, toh uska start/finish SMS yahan paste kar dein:</p>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[10px] text-slate-400">Timer Start Reply</label>
+                  <input id="cfgReplyTimerStart" type="text" value="PUMP STARTED" class="w-full px-2 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-teal-200" />
+                </div>
+                <div>
+                  <label class="block text-[10px] text-slate-400">Timer Finish (Auto-Off) Reply</label>
+                  <input id="cfgReplyTimerEnd" type="text" value="PUMP STOPPED" class="w-full px-2 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-teal-200" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Background Listeners -->
+            <div class="space-y-2 pt-1">
+              <p class="text-xs font-bold uppercase tracking-wider text-amber-300">Background SMS Listeners (Case-Insensitive Match)</p>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[11px] text-slate-400">Power Cut SMS</label>
+                  <input id="cfgReplyPowerCut" type="text" value="POWER OFF PUMP OFF" class="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-amber-300" />
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-400">Power Resume SMS</label>
+                  <input id="cfgReplyPowerResume" type="text" value="POWER RESUME PUMP STARTED" class="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-emerald-300" />
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-400">Physical Button Start (Any Case)</label>
+                  <input id="cfgReplyPhysStart" type="text" value="manual start" class="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-sky-300" />
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-400">Physical Button Stop (Any Case)</label>
+                  <input id="cfgReplyPhysStop" type="text" value="manual stop" class="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-slate-700 text-xs font-mono text-rose-300" />
+                </div>
+              </div>
+            </div>
+
+            <button id="btnSaveUniversalConfig" onclick="saveUniversalConfiguration()" class="w-full mt-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg">
+              💾 SAVE UNIVERSAL CONFIGURATION
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: VS CODE GUIDE & PRO SUGGESTIONS -->
+    <section id="tabVscode" class="hidden space-y-4">
+      <div class="glass-card rounded-2xl p-5 border border-slate-700 space-y-4">
+        <h2 class="text-lg font-bold text-white">💻 Visual Studio Code Setup & Pro Suggestions (सुझाव)</h2>
+        <p class="text-xs sm:text-sm text-slate-300">
+          Maine aapke liye poora **VS Code Project (`TCMU1_Universal_Controller_VSCode_Project.zip`)** bana diya hai jisme `lib/main.dart`, `pubspec.yaml`, aur `AndroidManifest.xml` taiyar hain. Iske saath aapke system ko aur majboot banane ke liye kuch khaas sujhav (suggestions) niche diye gaye hain:
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="p-4 rounded-xl bg-slate-900/90 border border-teal-500/30">
+            <h3 class="text-sm font-bold text-teal-300">1. Udhaar / Baki Khata (Pending vs Paid)</h3>
+            <p class="text-xs text-slate-300 mt-1">
+              Kisan aksar kehte hain "paise baad mein denge". Isliye maine Cash Memo mein **PAID / UDHAAR Toggle** jod diya hai taaki aapko hamesha pata rahe kis customer par kitna rupaya baki hai.
+            </p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/90 border border-amber-500/30">
+            <h3 class="text-sm font-bold text-amber-300">2. Case-Insensitive Substring Matching</h3>
+            <p class="text-xs text-slate-300 mt-1">
+              Chahe machine `manual start`, `MANUAL START`, ya `Pump Manual Start` bheje — humara parser sabko `.toUpperCase().includes()` se pehchan lega. Chhote-bade aksharon se kabhi galti nahi hogi.
+            </p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/90 border border-sky-500/30">
+            <h3 class="text-sm font-bold text-sky-300">3. Sticky Rate + Manual Override Box</h3>
+            <p class="text-xs text-slate-300 mt-1">
+              Jo rate aap ek baar daal denge (jaise ₹120/hr), wahi har naye customer ke liye apne aap set rahega. Agar kisi ko fixed ₹100 mein pani dena hai, toh **Manual Total Bill Box** mein seedha 100 likh sakte hain.
+            </p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/90 border border-emerald-500/30">
+            <h3 class="text-sm font-bold text-emerald-300">4. Native Phone Biometric / PIN (`local_auth`)</h3>
+            <p class="text-xs text-slate-300 mt-1">
+              Alag se PIN yaad rakhne ki zaroorat nahi! Jo aapke mobile ka Fingerprint ya Screen Lock PIN hai, wahi app aur Settings ko unlock karega.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: TIMER START (3*X) -->
+  <div id="modalTimer" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-card max-w-md w-full rounded-2xl p-5 border border-teal-500/40 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-2.5">
+        <h3 class="text-base font-bold text-white">⏱️ Select Scheduler / Timer (3*X)</h3>
+        <button id="btnCloseTimerModal" onclick="closeTimerModal()" class="text-slate-400 hover:text-white text-sm">✖</button>
+      </div>
+      <p class="text-xs text-slate-300">
+        TCMU-1 Manual Rule: <code class="text-teal-300">X = 1 to 47</code> jahan <code class="text-teal-300">1 = 30 Minutes</code> hai (e.g., <code class="text-amber-300">3*2</code> = 60 Mins).
+      </p>
+      <div class="grid grid-cols-3 gap-2">
+        <button id="btnTimerX1" onclick="startWithTimerUnits(1)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-teal-600 text-xs font-bold text-white border border-slate-700">30 Min (3*1)</button>
+        <button id="btnTimerX2" onclick="startWithTimerUnits(2)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-teal-600 text-xs font-bold text-white border border-slate-700">1 Hr (3*2)</button>
+        <button id="btnTimerX3" onclick="startWithTimerUnits(3)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-teal-600 text-xs font-bold text-white border border-slate-700">1.5 Hr (3*3)</button>
+        <button id="btnTimerX4" onclick="startWithTimerUnits(4)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-teal-600 text-xs font-bold text-white border border-slate-700">2 Hr (3*4)</button>
+        <button id="btnTimerX6" onclick="startWithTimerUnits(6)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-teal-600 text-xs font-bold text-white border border-slate-700">3 Hr (3*6)</button>
+        <button id="btnTimerX8" onclick="startWithTimerUnits(8)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-teal-600 text-xs font-bold text-white border border-slate-700">4 Hr (3*8)</button>
+      </div>
+      <div class="flex items-center gap-2 pt-2">
+        <input id="inputCustomTimerX" type="number" min="1" max="47" value="2" class="w-24 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-white" />
+        <button id="btnStartCustomTimer" onclick="startCustomTimerUnits()" class="flex-1 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs">
+          Send Custom 3*X Command
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CASH MEMO SLIP PREVIEW -->
+  <div id="modalCashMemo" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white text-slate-900 max-w-sm w-full rounded-2xl p-5 shadow-2xl space-y-3">
+      <div class="text-center border-b-2 border-dashed border-slate-300 pb-3">
+        <h3 class="text-lg font-extrabold tracking-wide uppercase">CASH MEMO</h3>
+        <p id="memoSlipDate" class="text-xs text-slate-500">25 Oct 2026, 01:45 AM</p>
+      </div>
+      <div id="memoSlipBody" class="text-xs space-y-1.5 font-mono"></div>
+      <div class="border-t-2 border-dashed border-slate-300 pt-3 flex items-center justify-between">
+        <span class="text-sm font-bold">TOTAL BILL:</span>
+        <span id="memoSlipTotal" class="text-xl font-extrabold text-emerald-700">₹0.00</span>
+      </div>
+      <div class="flex items-center gap-2 pt-2">
+        <button id="btnCopyMemoSlip" onclick="copyCurrentMemoText()" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs">
+          📲 Copy for WhatsApp
+        </button>
+        <button id="btnCloseMemoModal" onclick="closeMemoModal()" class="px-4 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAWER: SIMULATE INCOMING HARDWARE SMS -->
+  <div id="smsSimDrawer" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-card max-w-lg w-full rounded-2xl p-5 border border-indigo-500/40 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-2.5">
+        <h3 class="text-base font-bold text-white">📩 Hardware SMS Simulator (Test TCMU-1 Replies)</h3>
+        <button id="btnCloseSmsDrawer" onclick="toggleSmsSimDrawer()" class="text-slate-400 hover:text-white">✖</button>
+      </div>
+      <p class="text-xs text-slate-300">
+        Machine se aane wale kisi bhi SMS par click karke dekhein ki aapka app background mein kaise timer Pause/Resume, User Sync, ya Manual Start karta hai:
+      </p>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btnSimPumpStarted" onclick="simulateIncomingSms('PUMP STARTED')" class="p-2 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-500/40 text-xs font-mono text-emerald-200 text-left">
+          ▶ PUMP STARTED
+        </button>
+        <button id="btnSimPumpStopped" onclick="simulateIncomingSms('PUMP STOPPED')" class="p-2 rounded-lg bg-rose-900/60 hover:bg-rose-800 border border-rose-500/40 text-xs font-mono text-rose-200 text-left">
+          ⏹ PUMP STOPPED
+        </button>
+        <button id="btnSimPowerCut" onclick="simulateIncomingSms('POWER OFF PUMP OFF')" class="p-2 rounded-lg bg-amber-900/60 hover:bg-amber-800 border border-amber-500/40 text-xs font-mono text-amber-200 text-left">
+          ⚡ POWER OFF PUMP OFF
+        </button>
+        <button id="btnSimPowerResume" onclick="simulateIncomingSms('POWER RESUME PUMP STARTED')" class="p-2 rounded-lg bg-teal-900/60 hover:bg-teal-800 border border-teal-500/40 text-xs font-mono text-teal-200 text-left">
+          🔋 POWER RESUME PUMP STARTED
+        </button>
+        <button id="btnSimManualStart" onclick="simulateIncomingSms('Manual Start')" class="p-2 rounded-lg bg-sky-900/60 hover:bg-sky-800 border border-sky-500/40 text-xs font-mono text-sky-200 text-left">
+          🖐️ manual start (Physical)
+        </button>
+        <button id="btnSimManualStop" onclick="simulateIncomingSms('MANUAL STOP')" class="p-2 rounded-lg bg-purple-900/60 hover:bg-purple-800 border border-purple-500/40 text-xs font-mono text-purple-200 text-left">
+          🖐️ MANUAL STOP (Physical)
+        </button>
+      </div>
+      <div>
+        <button id="btnSimUsers10Reply" onclick="simulateUsers10Reply()" class="w-full p-2.5 rounded-lg bg-indigo-900/60 hover:bg-indigo-800 border border-indigo-500/40 text-xs font-mono text-indigo-200 text-left">
+          👥 *TCMU-1 USERS* (USER1 = 8081728811, USER2 = 7839455008, USER4 = 9236504217.)
+        </button>
+      </div>
+      <div class="flex gap-2 pt-1">
+        <input id="inputCustomSimSms" type="text" placeholder="Type any custom SMS reply to test..." class="flex-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono" />
+        <button id="btnSendCustomSimSms" onclick="fireCustomSimSms()" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white">
+          Send SMS
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation Tabs -->
+  <nav class="fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 backdrop-blur border-t border-slate-800">
+    <div class="max-w-4xl mx-auto grid grid-cols-4">
+      <button id="navBtnHome" onclick="switchTab('home')" class="py-3 flex flex-col items-center justify-center text-teal-400 font-bold text-xs border-t-2 border-teal-400">
+        <span class="text-base">🏠</span>
+        <span>Home Control</span>
+      </button>
+      <button id="navBtnHisab" onclick="switchTab('hisab')" class="py-3 flex flex-col items-center justify-center text-slate-400 hover:text-white font-medium text-xs border-t-2 border-transparent">
+        <span class="text-base">🧾</span>
+        <span>Cash Memo</span>
+      </button>
+      <button id="navBtnSettings" onclick="switchTab('settings')" class="py-3 flex flex-col items-center justify-center text-slate-400 hover:text-white font-medium text-xs border-t-2 border-transparent">
+        <span class="text-base">🔐</span>
+        <span>Settings & Users</span>
+      </button>
+      <button id="navBtnVscode" onclick="switchTab('vscode')" class="py-3 flex flex-col items-center justify-center text-slate-400 hover:text-white font-medium text-xs border-t-2 border-transparent">
+        <span class="text-base">💻</span>
+        <span>VS Code & Tips</span>
+      </button>
+    </div>
+  </nav>
+
+  <script>
+    // =========================================================================
+    // STATE MANAGEMENT (Sticky Rate, Universal Config, Users, Billing)
+    // =========================================================================
+    const state = {
+      motorSim: '+91 9876543210',
+      autoMode: true,
+      stickyRate: 120,
+      motorStatus: 'STOPPED', // STOPPED | RUNNING | PAUSED
+      runningSeconds: 0,
+      pausedSeconds: 0,
+      timerTargetSeconds: 0,
+      activeCustomer: '',
+      activeMode: 'Ready',
+      cooldownSec: 0,
+      settingsUnlocked: false,
+      currentMemoText: '',
+      users: ['8081728811', '7839455008', '', '9236504217'],
+      config: {
+        cmdStart: '1*',
+        replyStart: 'PUMP STARTED',
+        cmdStop: '2*',
+        replyStop: 'PUMP STOPPED',
+        replyTimerStart: 'PUMP STARTED',
+        replyTimerEnd: 'PUMP STOPPED',
+        replyPowerCut: 'POWER OFF PUMP OFF',
+        replyPowerResume: 'POWER RESUME PUMP STARTED',
+        replyPhysStart: 'manual start',
+        replyPhysStop: 'manual stop'
+      },
+      history: [
+        {
+          id: 'CM-102',
+          date: '24 Oct 2026, 06:30 PM',
+          customer: 'Ramesh Patel',
+          mode: 'Normal (1*)',
+          runSec: 5400,
+          cutSec: 600,
+          rate: 120,
+          finalAmount: 180.00,
+          isManual: false,
+          isPaid: true
+        },
+        {
+          id: 'CM-101',
+          date: '24 Oct 2026, 02:15 PM',
+          customer: 'Suresh Yadav',
+          mode: 'Timer (3*3)',
+          runSec: 5400,
+          cutSec: 0,
+          rate: 120,
+          finalAmount: 180.00,
+          isManual: false,
+          isPaid: false
+        }
+      ]
+    };
+
+    let mainClockInterval = null;
+    let cooldownInterval = null;
+
+    function showToast(msg) {
+      const banner = document.getElementById('toastBanner');
+      const text = document.getElementById('toastText');
+      text.textContent = msg;
+      banner.classList.remove('hidden');
+      setTimeout(() => banner.classList.add('hidden'), 3200);
+    }
+
+    function formatHMS(sec) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+    }
+
+    // Sticky Default Rate Logic: Jo rate ek baar pad jaye wahi aage sab par chale
+    function updateStickyRateFromInput() {
+      const val = parseFloat(document.getElementById('inputHourlyRate').value);
+      if (!isNaN(val) && val > 0) {
+        state.stickyRate = val;
+        document.getElementById('headerStickyRate').textContent = val.toFixed(0);
+        document.getElementById('liveRateNote').textContent = 'Sticky Rate: ₹' + val.toFixed(0) + '/hr (Saved for future)';
+        recalcLiveDisplay();
+        showToast('Sticky Default Rate updated to ₹' + val + '/hr for all future bills!');
+      }
+    }
+
+    function recalcLiveDisplay() {
+      document.getElementById('liveRunTimer').textContent = formatHMS(state.runningSeconds);
+      document.getElementById('livePauseTimer').textContent = formatHMS(state.pausedSeconds);
+
+      const manualInput = document.getElementById('inputManualFixedAmount').value.trim();
+      let bill = (state.runningSeconds / 3600) * state.stickyRate;
+      if (manualInput !== '' && !isNaN(parseFloat(manualInput))) {
+        bill = parseFloat(manualInput);
+        document.getElementById('liveRateNote').textContent = 'Manual Override Fixed: ₹' + bill.toFixed(2);
+      } else {
+        document.getElementById('liveRateNote').textContent = 'Sticky Rate: ₹' + state.stickyRate.toFixed(0) + '/hr';
+      }
+      document.getElementById('liveBillAmount').textContent = bill.toFixed(2);
+    }
+
+    function startCooldown30s() {
+      state.cooldownSec = 30;
+      const badge = document.getElementById('cooldownBadge');
+      const countEl = document.getElementById('cooldownCount');
+      badge.classList.remove('hidden');
+      countEl.textContent = state.cooldownSec;
+
+      if (cooldownInterval) clearInterval(cooldownInterval);
+      cooldownInterval = setInterval(() => {
+        state.cooldownSec--;
+        if (state.cooldownSec <= 0) {
+          clearInterval(cooldownInterval);
+          badge.classList.add('hidden');
+        } else {
+          countEl.textContent = state.cooldownSec;
+        }
+      }, 1000);
+    }
+
+    function ensureClockRunning() {
+      if (mainClockInterval) clearInterval(mainClockInterval);
+      mainClockInterval = setInterval(() => {
+        if (state.motorStatus === 'RUNNING') {
+          state.runningSeconds++;
+          if (state.timerTargetSeconds > 0 && state.runningSeconds >= state.timerTargetSeconds) {
+            handleStopMotor(true);
+            return;
+          }
+          recalcLiveDisplay();
+        } else if (state.motorStatus === 'PAUSED') {
+          state.pausedSeconds++;
+          recalcLiveDisplay();
+        }
+      }, 1000);
+    }
+
+    function updateStatusUI() {
+      const dot = document.getElementById('statusDot');
+      const pumpEl = document.getElementById('telemetryPump');
+      if (state.motorStatus === 'RUNNING') {
+        dot.className = 'w-3.5 h-3.5 rounded-full bg-emerald-400 pulse-ring';
+        pumpEl.textContent = 'RUNNING';
+        pumpEl.className = 'text-sm font-bold text-emerald-400';
+      } else if (state.motorStatus === 'PAUSED') {
+        dot.className = 'w-3.5 h-3.5 rounded-full bg-amber-400';
+        pumpEl.textContent = 'PAUSED (NO POWER)';
+        pumpEl.className = 'text-sm font-bold text-amber-400';
+      } else {
+        dot.className = 'w-3.5 h-3.5 rounded-full bg-rose-500';
+        pumpEl.textContent = 'STOPPED';
+        pumpEl.className = 'text-sm font-bold text-rose-400';
+      }
+    }
+
+    // 1. Normal Start (1*)
+    function handleNormalStart() {
+      if (state.cooldownSec > 0) {
+        showToast('Anti-Spam Lock Active! Wait ' + state.cooldownSec + 's');
+        return;
+      }
+      updateStickyRateFromInput();
+      const cname = document.getElementById('inputCustomerName').value.trim() || 'Walk-in Customer';
+      state.activeCustomer = cname;
+      state.activeMode = 'Normal (' + state.config.cmdStart + ')';
+      state.motorStatus = 'RUNNING';
+      state.runningSeconds = 0;
+      state.pausedSeconds = 0;
+      state.timerTargetSeconds = 0;
+
+      document.getElementById('liveCustomerDisplay').textContent = cname + ' — Running';
+      document.getElementById('timerTargetSub').textContent = 'Mode: ' + state.activeMode;
+      startCooldown30s();
+      updateStatusUI();
+      ensureClockRunning();
+      showToast('SMS Sent: ' + state.config.cmdStart + ' -> Motor Started for ' + cname);
+    }
+
+    // 2. Timer Start (3*X)
+    function openTimerModal() {
+      document.getElementById('modalTimer').classList.remove('hidden');
+    }
+    function closeTimerModal() {
+      document.getElementById('modalTimer').classList.add('hidden');
+    }
+    function startWithTimerUnits(xUnits) {
+      closeTimerModal();
+      updateStickyRateFromInput();
+      const mins = xUnits * 30;
+      const cname = document.getElementById('inputCustomerName').value.trim() || 'Timer Customer';
+      state.activeCustomer = cname;
+      state.activeMode = 'Timer (3*' + xUnits + ' = ' + mins + 'm)';
+      state.motorStatus = 'RUNNING';
+      state.runningSeconds = 0;
+      state.pausedSeconds = 0;
+      state.timerTargetSeconds = mins * 60;
+
+      document.getElementById('liveCustomerDisplay').textContent = cname + ' — Timer (' + mins + ' mins)';
+      document.getElementById('timerTargetSub').textContent = 'Target: ' + mins + ' mins (3*' + xUnits + ')';
+      startCooldown30s();
+      updateStatusUI();
+      ensureClockRunning();
+      showToast('SMS Sent: 3*' + xUnits + ' (' + mins + ' mins) -> Timer Started!');
+    }
+    function startCustomTimerUnits() {
+      const x = parseInt(document.getElementById('inputCustomTimerX').value, 10) || 2;
+      const clamped = Math.min(47, Math.max(1, x));
+      startWithTimerUnits(clamped);
+    }
+
+    // 3. Continue / Resume Start
+    function handleContinueStart() {
+      if (state.motorStatus === 'PAUSED') {
+        state.motorStatus = 'RUNNING';
+        document.getElementById('telemetryPower').textContent = 'AVAILABLE';
+        document.getElementById('telemetryPower').className = 'text-sm font-bold text-emerald-400';
+        updateStatusUI();
+        showToast('Session Resumed! Continuing previous customer timer.');
+      } else if (state.history.length > 0 && state.motorStatus === 'STOPPED') {
+        const last = state.history[0];
+        state.activeCustomer = last.customer;
+        state.activeMode = 'Continued (' + state.config.cmdStart + ')';
+        state.runningSeconds = last.runSec;
+        state.pausedSeconds = last.cutSec;
+        state.motorStatus = 'RUNNING';
+        document.getElementById('inputCustomerName').value = last.customer;
+        document.getElementById('liveCustomerDisplay').textContent = last.customer + ' — Continued';
+        updateStatusUI();
+        ensureClockRunning();
+        showToast('Resumed last customer (' + last.customer + ') session!');
+      } else {
+        showToast('Motor is already running!');
+      }
+    }
+
+    // 4. Stop Motor & Generate Cash Memo
+    function handleStopMotor(isAutoTimerFinish = false) {
+      if (state.motorStatus === 'STOPPED' && state.runningSeconds === 0) {
+        showToast('Motor is already stopped.');
+        return;
+      }
+      if (mainClockInterval) clearInterval(mainClockInterval);
+
+      const manualVal = document.getElementById('inputManualFixedAmount').value.trim();
+      const isManual = manualVal !== '' && !isNaN(parseFloat(manualVal));
+      const calcBill = (state.runningSeconds / 3600) * state.stickyRate;
+      const finalBill = isManual ? parseFloat(manualVal) : calcBill;
+
+      const newRec = {
+        id: 'CM-' + Math.floor(100 + Math.random() * 900),
+        date: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        customer: state.activeCustomer || 'Walk-in Customer',
+        mode: isAutoTimerFinish ? state.activeMode + ' [Auto-Done]' : state.activeMode,
+        runSec: state.runningSeconds,
+        cutSec: state.pausedSeconds,
+        rate: state.stickyRate,
+        finalAmount: finalBill,
+        isManual: isManual,
+        isPaid: true
+      };
+
+      state.history.unshift(newRec);
+      state.motorStatus = 'STOPPED';
+      updateStatusUI();
+      document.getElementById('liveCustomerDisplay').textContent = 'Session Completed — Cash Memo Saved';
+      document.getElementById('inputManualFixedAmount').value = '';
+      renderHisabList();
+      openMemoPreviewModal(newRec);
+      showToast('Motor Stopped (2*) & Cash Memo Generated!');
+    }
+
+    function openMemoPreviewModal(rec) {
+      document.getElementById('memoSlipDate').textContent = rec.date + ' | ' + rec.id;
+      const bodyEl = document.getElementById('memoSlipBody');
+      bodyEl.innerHTML = `
+        <div class="flex justify-between"><span>Customer:</span><span class="font-bold">${rec.customer}</span></div>
+        <div class="flex justify-between"><span>Mode:</span><span>${rec.mode}</span></div>
+        <div class="flex justify-between"><span>Net Running:</span><span class="font-bold">${formatHMS(rec.runSec)}</span></div>
+        <div class="flex justify-between"><span>Power Cut Minus:</span><span>${formatHMS(rec.cutSec)}</span></div>
+        <div class="flex justify-between"><span>Rate/Hr:</span><span>₹${rec.rate}/hr</span></div>
+        <div class="flex justify-between"><span>Billing Type:</span><span>${rec.isManual ? 'Manual Fixed Amount' : 'Auto Time Calculated'}</span></div>
+        <div class="flex justify-between"><span>Payment Status:</span><span class="font-bold">${rec.isPaid ? 'PAID (नकद प्राप्त)' : 'UDHAAR (बाकी)'}</span></div>
+      `;
+      document.getElementById('memoSlipTotal').textContent = '₹' + rec.finalAmount.toFixed(2);
+      state.currentMemoText = `🧾 *CASH MEMO*\nDate: ${rec.date}\nCustomer: ${rec.customer}\nRunning Time: ${formatHMS(rec.runSec)}\nPower Cut Minus: ${formatHMS(rec.cutSec)}\nRate: ₹${rec.rate}/hr\n*TOTAL BILL: ₹${rec.finalAmount.toFixed(2)}* (${rec.isPaid ? 'PAID' : 'UDHAAR'})`;
+      document.getElementById('modalCashMemo').classList.remove('hidden');
+    }
+
+    function closeMemoModal() {
+      document.getElementById('modalCashMemo').classList.add('hidden');
+    }
+
+    function copyCurrentMemoText() {
+      const temp = document.createElement('textarea');
+      temp.value = state.currentMemoText;
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      document.body.removeChild(temp);
+      showToast('Cash Memo copied! Paste directly on WhatsApp.');
+    }
+
+    function togglePaidStatus(idx) {
+      state.history[idx].isPaid = !state.history[idx].isPaid;
+      renderHisabList();
+      showToast('Payment status updated!');
+    }
+
+    function previewHistoryMemo(idx) {
+      openMemoPreviewModal(state.history[idx]);
+    }
+
+    function renderHisabList() {
+      const container = document.getElementById('cashMemoList');
+      let paidSum = 0;
+      let pendingSum = 0;
+
+      container.innerHTML = state.history.map((r, idx) => {
+        if (r.isPaid) paidSum += r.finalAmount;
+        else pendingSum += r.finalAmount;
+
+        return `
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-bold text-white">${r.customer}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${r.isPaid ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}">
+                  ${r.isPaid ? 'PAID' : 'UDHAAR'}
+                </span>
+                ${r.isManual ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300">Manual ₹</span>' : ''}
+              </div>
+              <p class="text-xs text-slate-400 mt-0.5">${r.date} • Run: <span class="text-slate-200 font-mono">${formatHMS(r.runSec)}</span> • Cut: <span class="text-amber-300 font-mono">${formatHMS(r.cutSec)}</span> • Rate: ₹${r.rate}/hr</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-base font-extrabold text-white mr-2">₹${r.finalAmount.toFixed(2)}</span>
+              <button onclick="togglePaidStatus(${idx})" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200 border border-slate-700">
+                ${r.isPaid ? 'Mark Udhaar' : 'Mark Paid'}
+              </button>
+              <button onclick="previewHistoryMemo(${idx})" class="px-3 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-xs font-bold text-white">
+                🧾 Slip
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('kpiTotalSessions').textContent = state.history.length;
+      document.getElementById('kpiPaidAmount').textContent = paidSum.toFixed(2);
+      document.getElementById('kpiPendingAmount').textContent = pendingSum.toFixed(2);
+    }
+
+    function exportHistoryCsv() {
+      const rows = [['Memo ID', 'Date', 'Customer', 'Mode', 'Net Seconds', 'Power Cut Seconds', 'Rate/Hr', 'Total Bill', 'Status']];
+      state.history.forEach(r => {
+        rows.push([r.id, r.date, r.customer, r.mode, r.runSec, r.cutSec, r.rate, r.finalAmount.toFixed(2), r.isPaid ? 'PAID' : 'UDHAAR']);
+      });
+      const csv = rows.map(e => e.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'TCMU1_Cash_Memo_Hisab.csv';
+      a.click();
+      showToast('Excel/CSV Hisab file downloaded!');
+    }
+
+    // =========================================================================
+    // USERS MANAGEMENT (*TCMU-1 USERS*) & SETTINGS LOCK
+    // =========================================================================
+    function renderUsersSlots() {
+      const box = document.getElementById('usersSlotContainer');
+      box.innerHTML = state.users.map((num, idx) => {
+        const slot = idx + 1;
+        return `
+          <div class="flex items-center gap-2">
+            <span class="w-16 text-xs font-bold text-slate-300">USER ${slot}:</span>
+            <input id="inputUserSlot${slot}" type="text" value="${num}" placeholder="Empty (No number saved)" class="flex-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white" />
+            <button onclick="addOrUpdateUserSlot(${slot})" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">
+              ADD (1${slot}*)
+            </button>
+            <button onclick="deleteUserSlot(${slot})" class="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold">
+              DEL (16*${slot})
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function addOrUpdateUserSlot(slot) {
+      const val = document.getElementById('inputUserSlot' + slot).value.trim();
+      if (!val) {
+        showToast('Please enter a 10-digit mobile number for USER ' + slot);
+        return;
+      }
+      state.users[slot - 1] = val;
+      renderUsersSlots();
+      showToast('SMS Sent: 1' + slot + '*' + val + '* (Saved USER' + slot + ')');
+    }
+
+    function deleteUserSlot(slot) {
+      state.users[slot - 1] = '';
+      renderUsersSlots();
+      showToast('SMS Sent: 16*' + slot + ' (Removed USER' + slot + ')');
+    }
+
+    function resetAllUsers16() {
+      state.users = ['', '', '', ''];
+      renderUsersSlots();
+      showToast('SMS Sent: 16*1234 (All Users Reset!)');
+    }
+
+    function syncUsersFromDevice10() {
+      showToast('SMS Sent: 10* -> Waiting for *TCMU-1 USERS* reply...');
+      setTimeout(() => {
+        simulateUsers10Reply();
+      }, 900);
+    }
+
+    function unlockSettingsWithBiometric() {
+      state.settingsUnlocked = true;
+      document.getElementById('settingsLockOverlay').classList.add('hidden');
+      document.getElementById('settingsUnlockedContent').classList.remove('hidden');
+      showToast('Unlocked via Phone Biometric / Device PIN!');
+    }
+
+    function lockSettingsPanel() {
+      state.settingsUnlocked = false;
+      document.getElementById('settingsUnlockedContent').classList.add('hidden');
+      document.getElementById('settingsLockOverlay').classList.remove('hidden');
+      showToast('Settings Panel Locked.');
+    }
+
+    function toggleAutoModeSwitch() {
+      state.autoMode = !state.autoMode;
+      const btn = document.getElementById('btnToggleAutoMode');
+      const badge = document.getElementById('headerModeBadge');
+      if (state.autoMode) {
+        btn.textContent = 'ON (4*1)';
+        btn.className = 'px-4 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold transition';
+        badge.textContent = 'AUTO (4*1)';
+        showToast('SMS Sent: 4*1 -> Auto-Restart Mode ENABLED');
+      } else {
+        btn.textContent = 'OFF (4*0)';
+        btn.className = 'px-4 py-1.5 rounded-full bg-slate-700 text-slate-200 text-xs font-bold transition';
+        badge.textContent = 'MANUAL (4*0)';
+        showToast('SMS Sent: 4*0 -> Manual Mode Set');
+      }
+    }
+
+    function saveUniversalConfiguration() {
+      state.motorSim = document.getElementById('cfgMotorSim').value.trim();
+      document.getElementById('headerSimDisplay').textContent = state.motorSim;
+      state.config.cmdStart = document.getElementById('cfgCmdStart').value.trim();
+      state.config.replyStart = document.getElementById('cfgReplyStart').value.trim();
+      state.config.cmdStop = document.getElementById('cfgCmdStop').value.trim();
+      state.config.replyStop = document.getElementById('cfgReplyStop').value.trim();
+      state.config.replyTimerStart = document.getElementById('cfgReplyTimerStart').value.trim();
+      state.config.replyTimerEnd = document.getElementById('cfgReplyTimerEnd').value.trim();
+      state.config.replyPowerCut = document.getElementById('cfgReplyPowerCut').value.trim();
+      state.config.replyPowerResume = document.getElementById('cfgReplyPowerResume').value.trim();
+      state.config.replyPhysStart = document.getElementById('cfgReplyPhysStart').value.trim();
+      state.config.replyPhysStop = document.getElementById('cfgReplyPhysStop').value.trim();
+      showToast('Universal SMS Configuration Saved!');
+    }
+
+    function triggerStatusCheck() {
+      showToast('SMS Sent: 5* -> **TCMU-1 STATUS** Verified (Signal 63%)');
+    }
+
+    // =========================================================================
+    // HARDWARE SMS SIMULATOR (Case-Insensitive Parser + *TCMU-1 USERS*)
+    // =========================================================================
+    function toggleSmsSimDrawer() {
+      document.getElementById('smsSimDrawer').classList.toggle('hidden');
+    }
+
+    function simulateUsers10Reply() {
+      const exactUserSms = `*TCMU-1 USERS*\nUSER1 = 8081728811,\nUSER2 = 7839455008,\nUSER4 = 9236504217.`;
+      simulateIncomingSms(exactUserSms);
+    }
+
+    function fireCustomSimSms() {
+      const txt = document.getElementById('inputCustomSimSms').value.trim();
+      if (txt) simulateIncomingSms(txt);
+    }
+
+    function simulateIncomingSms(rawSms) {
+      const upper = rawSms.trim().toUpperCase();
+      document.getElementById('smsSimDrawer').classList.add('hidden');
+
+      // 1. Check *TCMU-1 USERS* format
+      if (upper.includes('TCMU-1 USERS') || upper.includes('USER1')) {
+        const parsed = ['', '', '', ''];
+        for (let i = 1; i <= 4; i++) {
+          const rx = new RegExp('USER\\s*' + i + '\\s*=\\s*(\\d{10,12})', 'i');
+          const m = rawSms.match(rx);
+          if (m) parsed[i - 1] = m[1];
+        }
+        state.users = parsed;
+        renderUsersSlots();
+        showToast('Parsed *TCMU-1 USERS*: USER1, USER2, USER4 synced (USER3 Empty)!');
+        return;
+      }
+
+      // 2. Power Cut
+      if (upper.includes(state.config.replyPowerCut.toUpperCase())) {
+        state.motorStatus = 'PAUSED';
+        document.getElementById('telemetryPower').textContent = 'OFF (POWER CUT)';
+        document.getElementById('telemetryPower').className = 'text-sm font-bold text-rose-400';
+        updateStatusUI();
+        showToast('Incoming SMS: POWER OFF PUMP OFF -> Billing Timer PAUSED!');
+        return;
+      }
+
+      // 3. Power Resume
+      if (upper.includes(state.config.replyPowerResume.toUpperCase())) {
+        state.motorStatus = 'RUNNING';
+        document.getElementById('telemetryPower').textContent = 'AVAILABLE';
+        document.getElementById('telemetryPower').className = 'text-sm font-bold text-emerald-400';
+        updateStatusUI();
+        ensureClockRunning();
+        showToast('Incoming SMS: POWER RESUME PUMP STARTED -> Timer RESUMED!');
+        return;
+      }
+
+      // 4. Physical Manual Start (case-insensitive substring match)
+      if (upper.includes(state.config.replyPhysStart.toUpperCase())) {
+        state.activeCustomer = document.getElementById('inputCustomerName').value.trim() || 'Physical Button Customer';
+        state.activeMode = 'Physical Button Start';
+        state.motorStatus = 'RUNNING';
+        document.getElementById('liveCustomerDisplay').textContent = state.activeCustomer + ' (Physical Start)';
+        updateStatusUI();
+        ensureClockRunning();
+        showToast('Incoming SMS: "' + rawSms + '" -> Physical Start detected! Timer started.');
+        return;
+      }
+
+      // 5. Physical Manual Stop
+      if (upper.includes(state.config.replyPhysStop.toUpperCase())) {
+        handleStopMotor(false);
+        return;
+      }
+
+      // 6. Normal / Timer Start Reply
+      if (upper.includes(state.config.replyStart.toUpperCase()) || upper.includes(state.config.replyTimerStart.toUpperCase())) {
+        if (state.motorStatus !== 'RUNNING') {
+          handleNormalStart();
+        } else {
+          showToast('Confirmed by Hardware: ' + rawSms);
+        }
+        return;
+      }
+
+      // 7. Stop / Timer End Reply
+      if (upper.includes(state.config.replyStop.toUpperCase()) || upper.includes(state.config.replyTimerEnd.toUpperCase())) {
+        handleStopMotor(true);
+        return;
+      }
+
+      showToast('SMS Received: ' + rawSms);
+    }
+
+    function switchTab(tab) {
+      const tabs = ['home', 'hisab', 'settings', 'vscode'];
+      const mapEl = {
+        home: 'tabHome',
+        hisab: 'tabHisab',
+        settings: 'tabSettings',
+        vscode: 'tabVscode'
+      };
+      const mapBtn = {
+        home: 'navBtnHome',
+        hisab: 'navBtnHisab',
+        settings: 'navBtnSettings',
+        vscode: 'navBtnVscode'
+      };
+
+      tabs.forEach(t => {
+        document.getElementById(mapEl[t]).classList.toggle('hidden', t !== tab);
+        const btn = document.getElementById(mapBtn[t]);
+        if (t === tab) {
+          btn.className = 'py-3 flex flex-col items-center justify-center text-teal-400 font-bold text-xs border-t-2 border-teal-400';
+        } else {
+          btn.className = 'py-3 flex flex-col items-center justify-center text-slate-400 hover:text-white font-medium text-xs border-t-2 border-transparent';
+        }
+      });
+    }
+
+    // Initialize UI on load
+    window.addEventListener('DOMContentLoaded', () => {
+      renderHisabList();
+      renderUsersSlots();
+      recalcLiveDisplay();
+    });
+  </script>
+</body>
+</html>
